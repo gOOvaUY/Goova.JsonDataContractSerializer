@@ -109,11 +109,7 @@ namespace Goova.JsonDataContractSerializer
                 }
             }
 
-            string uriTemplate = this.GetUriTemplate(operation);
-            if (uriTemplate != null)
-            {
-                throw new InvalidOperationException("UriTemplate support not implemented in this behavior.");
-            }
+
 
             WebMessageBodyStyle bodyStyle = this.GetBodyStyle(operation);
             int inputParameterCount = operation.Messages[0].Body.Parts.Count;

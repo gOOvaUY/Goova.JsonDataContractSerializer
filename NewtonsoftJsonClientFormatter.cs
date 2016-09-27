@@ -9,6 +9,8 @@ using System.ServiceModel.Dispatcher;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
+using Newtonsoft.Json;
+using Formatting = Newtonsoft.Json.Formatting;
 
 namespace Goova.JsonDataContractSerializer
 {
@@ -57,11 +59,13 @@ namespace Goova.JsonDataContractSerializer
             Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
             using (MemoryStream ms = new MemoryStream())
             {
-                using (StreamWriter sw = new StreamWriter(ms, Encoding.UTF8))
+                UTF8Encoding enc=new UTF8Encoding(false);
+                using (StreamWriter sw = new StreamWriter(ms, enc))
                 {
                     using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
                     {
-                        writer.Formatting = Newtonsoft.Json.Formatting.Indented;
+                        writer.Formatting = Newtonsoft.Json.Formatting.None;
+                        
                         if (parameters.Length == 1)
                         {
                             // Single parameter, assuming bare
@@ -90,7 +94,7 @@ namespace Goova.JsonDataContractSerializer
             requestMessage.Headers.To = operationUri;
             requestMessage.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
             HttpRequestMessageProperty reqProp = new HttpRequestMessageProperty();
-            reqProp.Headers[HttpRequestHeader.ContentType] = "application/json";
+            reqProp.Headers[HttpRequestHeader.ContentType] = "application/json; charset=utf-8";
             requestMessage.Properties.Add(HttpRequestMessageProperty.Name, reqProp);
             return requestMessage;
         }

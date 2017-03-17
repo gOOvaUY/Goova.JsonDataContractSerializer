@@ -6,6 +6,7 @@ using System.Net;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
+using System.ServiceModel.Web;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -26,10 +27,30 @@ namespace Goova.JsonDataContractSerializer
             {
                 endpointAddress = endpointAddress + "/";
             }
-
-            this.operationUri = new Uri(endpointAddress + operation.Name);
+            string uriTemplate = GetUriTemplate(operation);
+            if (!string.IsNullOrEmpty("GetUriTemplate"))
+            {
+                this.operationUri = new Uri(endpointAddress + uriTemplate);
+            }
+            else
+                this.operationUri = new Uri(endpointAddress + operation.Name);
         }
+        private string GetUriTemplate(OperationDescription operation)
+        {
+            WebGetAttribute wga = operation.Behaviors.Find<WebGetAttribute>();
+            if (wga != null)
+            {
+                return wga.UriTemplate;
+            }
 
+            WebInvokeAttribute wia = operation.Behaviors.Find<WebInvokeAttribute>();
+            if (wia != null)
+            {
+                return wia.UriTemplate;
+            }
+
+            return null;
+        }
         public object DeserializeReply(Message message, object[] parameters)
         {
             object bodyFormatProperty;

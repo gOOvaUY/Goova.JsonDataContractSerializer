@@ -93,28 +93,61 @@ namespace Goova.JsonDataContractSerializer
         public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
         {
             byte[] body;
-            Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
-
-            using (MemoryStream ms = new MemoryStream())
+            bool isjson = true;
+            if (result is Stream)
             {
-                UTF8Encoding enc = new UTF8Encoding(false);
-
-                using (StreamWriter sw = new StreamWriter(ms, enc))
+                isjson = false;
+                Stream r = (Stream) result;
+                body=new byte[r.Length];
+                r.Position = 0;
+                r.Read(body, 0, (int)r.Length);
+                r.Dispose();
+            }
+            else
+            {
+                Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
+                using (MemoryStream ms = new MemoryStream())
                 {
-                    using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
+                    UTF8Encoding enc = new UTF8Encoding(false);
+
+                    using (StreamWriter sw = new StreamWriter(ms, enc))
                     {
-                        writer.Formatting = Newtonsoft.Json.Formatting.None;
-                        serializer.Serialize(writer, result);
-                        sw.Flush();
-                        body = ms.ToArray();
+                        using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
+                        {
+                            writer.Formatting = Newtonsoft.Json.Formatting.None;
+                            serializer.Serialize(writer, result);
+                            sw.Flush();
+                            body = ms.ToArray();
+                        }
                     }
                 }
             }
 
+
             Message replyMessage = Message.CreateMessage(messageVersion, operation.Messages[1].Action, new RawBodyWriter(body));
             replyMessage.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
             HttpResponseMessageProperty respProp = new HttpResponseMessageProperty();
-            respProp.Headers[HttpResponseHeader.ContentType] = "application/json; charset=utf-8";
+            if (isjson)
+                respProp.Headers[HttpResponseHeader.ContentType] = "application/json; charset=utf-8";
+            else
+            {
+                bool dooctet = true;
+                if (result is StreamWithHeaders)
+                {
+                    Dictionary<string, string> headers = ((StreamWithHeaders) result).Headers;
+                    if (headers != null && headers.Count > 0)
+                    {
+                        dooctet = false;
+                        foreach (string s in headers.Keys)
+                        {
+                            respProp.Headers[s] = headers[s];
+
+                        }
+                    }
+                }
+                if (dooctet)
+                    respProp.Headers[HttpResponseHeader.ContentType] = "application/octet-stream";
+            }
             replyMessage.Properties.Add(HttpResponseMessageProperty.Name, respProp);
             return replyMessage;
         }

@@ -74,10 +74,15 @@ namespace Goova.JsonDataContractSerializer
             }
         }
 
+
         public Message SerializeRequest(MessageVersion messageVersion, object[] parameters)
         {
             byte[] body;
             Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
+            serializer.Formatting = Formatting.None;
+            serializer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+            serializer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
+            serializer.NullValueHandling = NullValueHandling.Ignore;
             using (MemoryStream ms = new MemoryStream())
             {
                 UTF8Encoding enc=new UTF8Encoding(false);
@@ -86,7 +91,8 @@ namespace Goova.JsonDataContractSerializer
                     using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
                     {
                         writer.Formatting = Newtonsoft.Json.Formatting.None;
-                        
+                        writer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+                        writer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
                         if (parameters.Length == 1)
                         {
                             // Single parameter, assuming bare

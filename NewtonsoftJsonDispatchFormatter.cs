@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Newtonsoft.Json;
+using Formatting = Newtonsoft.Json.Formatting;
 
 namespace Goova.JsonDataContractSerializer
 {
@@ -118,6 +119,10 @@ namespace Goova.JsonDataContractSerializer
             else
             {
                 Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
+                serializer.NullValueHandling = NullValueHandling.Ignore;
+                serializer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+                serializer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
+                serializer.Formatting = Formatting.None;
                 using (MemoryStream ms = new MemoryStream())
                 {
                     UTF8Encoding enc = new UTF8Encoding(false);
@@ -126,6 +131,8 @@ namespace Goova.JsonDataContractSerializer
                     {
                         using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
                         {
+                            writer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+                            writer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
                             writer.Formatting = Newtonsoft.Json.Formatting.None;
                             serializer.Serialize(writer, result);
                             sw.Flush();

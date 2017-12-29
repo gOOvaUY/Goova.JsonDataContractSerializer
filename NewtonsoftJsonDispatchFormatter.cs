@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Mime;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
@@ -42,13 +43,24 @@ namespace Goova.JsonDataContractSerializer
             {
                 throw new InvalidOperationException("Incoming messages must have a body format of Raw. Is a ContentTypeMapper set on the WebHttpBinding?");
             }
+            Encoding enc=Encoding.UTF8;
+            if (message.Properties.ContainsKey(HttpRequestMessageProperty.Name))
+            {
+                HttpRequestMessageProperty prop = (HttpRequestMessageProperty)message.Properties[HttpRequestMessageProperty.Name];
+                string contenttype=prop.Headers.Get("Content-Type");
+                if (!string.IsNullOrEmpty(contenttype))
+                {
+                    ContentType tp=new ContentType(contenttype);
+                    enc=Encoding.GetEncoding(tp.CharSet);
+                }
+            }
 
             XmlDictionaryReader bodyReader = message.GetReaderAtBodyContents();
             bodyReader.ReadStartElement("Binary");
             byte[] rawBody = bodyReader.ReadContentAsBase64();
             MemoryStream ms = new MemoryStream(rawBody);
 
-            StreamReader sr = new StreamReader(ms);
+            StreamReader sr = new StreamReader(ms,enc);
             Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
             if (parameters.Length == 1)
             {

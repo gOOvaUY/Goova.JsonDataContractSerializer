@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Formatting = Newtonsoft.Json.Formatting;
 
 namespace Goova.JsonDataContractSerializer
@@ -73,6 +74,7 @@ namespace Goova.JsonDataContractSerializer
                 }
             }
         }
+        private readonly JsonSerializerSettings serSettings = new JsonSerializerSettings { Formatting = Formatting.None, DateFormatHandling = DateFormatHandling.IsoDateFormat, DateTimeZoneHandling = DateTimeZoneHandling.Local, NullValueHandling = NullValueHandling.Ignore };
 
 
         public Message SerializeRequest(MessageVersion messageVersion, object[] parameters)
@@ -95,8 +97,11 @@ namespace Goova.JsonDataContractSerializer
                         writer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
                         if (parameters.Length == 1)
                         {
-                            // Single parameter, assuming bare
-                            serializer.Serialize(sw, parameters[0]);
+                            string so = JsonConvert.SerializeObject(parameters[0], Formatting.None, serSettings); //Canonicalize
+                            var parsedObject = JObject.Parse(so); //Canonicalize
+                            var normal = SortPropertiesAlphabetically(parsedObject); //Canonicalize
+                            string so2 = JsonConvert.SerializeObject(normal, Formatting.None, serSettings);
+                            sw.Write(Encoding.UTF8.GetBytes(so2));
                         }
                         else
                         {
@@ -104,7 +109,7 @@ namespace Goova.JsonDataContractSerializer
                             for (int i = 0; i < this.operation.Messages[0].Body.Parts.Count; i++)
                             {
                                 writer.WritePropertyName(this.operation.Messages[0].Body.Parts[i].Name);
-                                serializer.Serialize(writer, parameters[0]);
+                                serializer.Serialize(writer, parameters[i]);
                             }
 
                             writer.WriteEndObject();
@@ -124,6 +129,43 @@ namespace Goova.JsonDataContractSerializer
             reqProp.Headers[HttpRequestHeader.ContentType] = "application/json; charset=utf-8";
             requestMessage.Properties.Add(HttpRequestMessageProperty.Name, reqProp);
             return requestMessage;
+        }
+        private static JToken SortPropertiesAlphabetically(JToken original)
+        {
+            if (original is JObject)
+            {
+                var result = new JObject();
+                foreach (var property in ((JObject)original).Properties().ToList().OrderBy(p => p.Name))
+                {
+                    var value = property.Value;
+                    if (value != null)
+                        value = SortPropertiesAlphabetically(value);
+                    result.Add(property.Name, value);
+                }
+                return result;
+            }
+            if (original is JArray)
+            {
+                var array = original as JArray;
+                for (int i = 0; i < array.Count; i++)
+                    array[i] = SortPropertiesAlphabetically(array[i]);
+                return array;
+            }
+            if (original is JValue)
+            {
+                JValue n = (JValue)original;
+                if (n.Value is DateTime)
+                {
+                    DateTime dt = (DateTime)n.Value;
+                    if (dt.Kind != DateTimeKind.Local)
+                    {
+                        dt = dt.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(dt, DateTimeKind.Local) : dt.ToLocalTime();
+                        n.Value = dt;
+                    }
+                }
+                return n;
+            }
+            return original;
         }
     }
 }

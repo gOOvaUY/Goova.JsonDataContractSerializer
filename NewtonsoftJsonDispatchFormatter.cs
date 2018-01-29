@@ -52,7 +52,8 @@ namespace Goova.JsonDataContractSerializer
                 if (!string.IsNullOrEmpty(contenttype))
                 {
                     ContentType tp=new ContentType(contenttype);
-                    enc=Encoding.GetEncoding(tp.CharSet);
+                    if (!string.IsNullOrEmpty(tp.CharSet))
+                        enc=Encoding.GetEncoding(tp.CharSet);
                 }
             }
 

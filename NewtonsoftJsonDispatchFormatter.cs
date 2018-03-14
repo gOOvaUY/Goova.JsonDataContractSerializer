@@ -119,7 +119,7 @@ namespace Goova.JsonDataContractSerializer
             }
             else
             {
-                string so = JsonConvert.SerializeObject(parameters[0], Formatting.None, NewtonsoftJsonClientFormatter.serSettings); //Canonicalize
+                string so = JsonConvert.SerializeObject(result, Formatting.None, NewtonsoftJsonClientFormatter.serSettings); //Canonicalize
                 var parsedObject = JObject.Parse(so); //Canonicalize
                 var normal = NewtonsoftJsonClientFormatter.SortPropertiesAlphabetically(parsedObject); //Canonicalize
                 string so2 = JsonConvert.SerializeObject(normal, Formatting.None, NewtonsoftJsonClientFormatter.serSettings);

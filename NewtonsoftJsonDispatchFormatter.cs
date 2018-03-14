@@ -1,24 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Mime;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Formatting = Newtonsoft.Json.Formatting;
 
 namespace Goova.JsonDataContractSerializer
 {
-    class NewtonsoftJsonDispatchFormatter : IDispatchMessageFormatter
+    internal class NewtonsoftJsonDispatchFormatter : IDispatchMessageFormatter
     {
-        OperationDescription operation;
-        Dictionary<string, int> parameterNames;
+        private readonly OperationDescription operation;
+        private readonly Dictionary<string, int> parameterNames;
+
         public NewtonsoftJsonDispatchFormatter(OperationDescription operation, bool isRequest)
         {
             this.operation = operation;
@@ -27,10 +27,10 @@ namespace Goova.JsonDataContractSerializer
                 int operationParameterCount = operation.Messages[0].Body.Parts.Count;
                 if (operationParameterCount > 1)
                 {
-                    this.parameterNames = new Dictionary<string, int>();
+                    parameterNames = new Dictionary<string, int>();
                     for (int i = 0; i < operationParameterCount; i++)
                     {
-                        this.parameterNames.Add(operation.Messages[0].Body.Parts[i].Name, i);
+                        parameterNames.Add(operation.Messages[0].Body.Parts[i].Name, i);
                     }
                 }
             }
@@ -39,21 +39,21 @@ namespace Goova.JsonDataContractSerializer
         public void DeserializeRequest(Message message, object[] parameters)
         {
             object bodyFormatProperty;
-            if (!message.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out bodyFormatProperty) ||
-                (bodyFormatProperty as WebBodyFormatMessageProperty).Format != WebContentFormat.Raw)
+            if (!message.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out bodyFormatProperty) || (bodyFormatProperty as WebBodyFormatMessageProperty).Format != WebContentFormat.Raw)
             {
                 throw new InvalidOperationException("Incoming messages must have a body format of Raw. Is a ContentTypeMapper set on the WebHttpBinding?");
             }
-            Encoding enc=Encoding.UTF8;
+
+            Encoding enc = Encoding.UTF8;
             if (message.Properties.ContainsKey(HttpRequestMessageProperty.Name))
             {
-                HttpRequestMessageProperty prop = (HttpRequestMessageProperty)message.Properties[HttpRequestMessageProperty.Name];
-                string contenttype=prop.Headers.Get("Content-Type");
+                HttpRequestMessageProperty prop = (HttpRequestMessageProperty) message.Properties[HttpRequestMessageProperty.Name];
+                string contenttype = prop.Headers.Get("Content-Type");
                 if (!string.IsNullOrEmpty(contenttype))
                 {
-                    ContentType tp=new ContentType(contenttype);
+                    ContentType tp = new ContentType(contenttype);
                     if (!string.IsNullOrEmpty(tp.CharSet))
-                        enc=Encoding.GetEncoding(tp.CharSet);
+                        enc = Encoding.GetEncoding(tp.CharSet);
                 }
             }
 
@@ -62,8 +62,8 @@ namespace Goova.JsonDataContractSerializer
             byte[] rawBody = bodyReader.ReadContentAsBase64();
             MemoryStream ms = new MemoryStream(rawBody);
 
-            StreamReader sr = new StreamReader(ms,enc);
-            Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
+            StreamReader sr = new StreamReader(ms, enc);
+            JsonSerializer serializer = new JsonSerializer();
             if (parameters.Length == 1)
             {
                 // single parameter, assuming bare
@@ -72,22 +72,22 @@ namespace Goova.JsonDataContractSerializer
             else
             {
                 // multiple parameter, needs to be wrapped
-                Newtonsoft.Json.JsonReader reader = new Newtonsoft.Json.JsonTextReader(sr);
+                JsonReader reader = new JsonTextReader(sr);
                 reader.Read();
-                if (reader.TokenType != Newtonsoft.Json.JsonToken.StartObject)
+                if (reader.TokenType != JsonToken.StartObject)
                 {
                     throw new InvalidOperationException("Input needs to be wrapped in an object");
                 }
 
                 reader.Read();
-                while (reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName)
+                while (reader.TokenType == JsonToken.PropertyName)
                 {
                     string parameterName = reader.Value as string;
                     reader.Read();
-                    if (this.parameterNames.ContainsKey(parameterName))
+                    if (parameterNames.ContainsKey(parameterName))
                     {
-                        int parameterIndex = this.parameterNames[parameterName];
-                        parameters[parameterIndex] = serializer.Deserialize(reader, this.operation.Messages[0].Body.Parts[parameterIndex].Type);
+                        int parameterIndex = parameterNames[parameterName];
+                        parameters[parameterIndex] = serializer.Deserialize(reader, operation.Messages[0].Body.Parts[parameterIndex].Type);
                     }
                     else
                     {
@@ -112,35 +112,18 @@ namespace Goova.JsonDataContractSerializer
             {
                 isjson = false;
                 Stream r = (Stream) result;
-                body=new byte[r.Length];
+                body = new byte[r.Length];
                 r.Position = 0;
-                r.Read(body, 0, (int)r.Length);
+                r.Read(body, 0, (int) r.Length);
                 r.Dispose();
             }
             else
             {
-                Newtonsoft.Json.JsonSerializer serializer = new Newtonsoft.Json.JsonSerializer();
-                serializer.NullValueHandling = NullValueHandling.Ignore;
-                serializer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
-                serializer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
-                serializer.Formatting = Formatting.None;
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    UTF8Encoding enc = new UTF8Encoding(false);
-
-                    using (StreamWriter sw = new StreamWriter(ms, enc))
-                    {
-                        using (Newtonsoft.Json.JsonWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
-                        {
-                            writer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
-                            writer.DateTimeZoneHandling = DateTimeZoneHandling.Local;
-                            writer.Formatting = Newtonsoft.Json.Formatting.None;
-                            serializer.Serialize(writer, result);
-                            sw.Flush();
-                            body = ms.ToArray();
-                        }
-                    }
-                }
+                string so = JsonConvert.SerializeObject(parameters[0], Formatting.None, NewtonsoftJsonClientFormatter.serSettings); //Canonicalize
+                var parsedObject = JObject.Parse(so); //Canonicalize
+                var normal = NewtonsoftJsonClientFormatter.SortPropertiesAlphabetically(parsedObject); //Canonicalize
+                string so2 = JsonConvert.SerializeObject(normal, Formatting.None, NewtonsoftJsonClientFormatter.serSettings);
+                body = Encoding.UTF8.GetBytes(so2);
             }
 
 
@@ -161,13 +144,14 @@ namespace Goova.JsonDataContractSerializer
                         foreach (string s in headers.Keys)
                         {
                             respProp.Headers[s] = headers[s];
-
                         }
                     }
                 }
+
                 if (dooctet)
                     respProp.Headers[HttpResponseHeader.ContentType] = "application/octet-stream";
             }
+
             replyMessage.Properties.Add(HttpResponseMessageProperty.Name, respProp);
             return replyMessage;
         }
